@@ -1,0 +1,150 @@
+if not game:IsLoaded() then game.Loaded:Wait(); end
+
+local clonefunction = clonefunction or function(f) return (function(...) return f(...) end) end;
+local cloneref = cloneref or function(ref) return ref end;
+
+local genv = clonefunction(getgenv)();
+local sendpacket = clonefunction(send_packet);
+local setclipboard = clonefunction(setclipboard);
+
+if genv.CeleryPacketLogger and genv.CeleryPacketLogger_Disconnect then
+    genv.CeleryPacketLogger_Disconnect();
+    genv.CeleryPacketLogger = nil;
+end
+
+local CeleryPacketLogger = loadstring(game:HttpGet("https://raw.githubusercontent.com/Mp3Alt/UI/refs/heads/main/CeleryPacketLogger"), "CeleryPacketLogger")()
+local Modules = CeleryPacketLogger.Modules;
+--[[
+{
+    -->> Background <<--
+    ["ScreenGui"] = plogger,
+    ["Background"] = background,
+
+    ["Logo"] = logo,
+    ["Title"] = title,
+    ["Close"] = close,
+
+    -->> Packet Logs <<--
+    ["Sidebar"] = holder,
+    ["PacketTemplate"] = template,
+
+    -->> Packet Info <<--
+    ["PacketId"] = Id,
+    ["PacketSize"] = Size,
+    ["PacketData"] = data,
+
+    -->> Buttons <<--
+    ["SendPacket"] = sendPacket,
+    ["BlockPacket"] = blockPacket,
+    ["ClearLogs"] = clearLogs,
+    ["ClearBlocklist"] = clearBlocklist,
+    ["CopyPacket"] = copyPacket,
+    ["ConvertToRaw"] = convert,
+
+    -->> Modules <<--
+    ["Modules"] = {
+        ["Packet"] = packetModule,
+    },
+
+    -->> Variables <<--
+    ["BlockedPackets"] = blockedPackets,
+    ["AllPackets"] = allPackets,
+
+}
+]]
+
+local function toHex(packetData)
+    local hexParts = {};
+    for i = 1, #packetData do
+        hexParts[i] = '0x'..string.format("%02X", packetData[i]);
+    end
+
+    if #hexParts == 0 then
+        return "";
+    end
+
+    local lines = {}
+    for i = 1, #hexParts, 30 do
+        table.insert(lines, table.concat(hexParts, " ", i, math.min(i + 30 - 1, #hexParts)));
+    end
+    return table.concat(lines, "\n");
+end
+
+local state, selected, connections = false, nil, {};
+connections.closeGui = CeleryPacketLogger.Close.MouseButton1Click:Connect(function()
+    genv.CeleryPacketLogger_Disconnect();
+    CeleryPacketLogger.ScreenGui:Destroy();
+end)
+
+connections.toggleState = CeleryPacketLogger.Logo.MouseButton1Click:Connect(function()
+    state = not state;
+end)
+
+connections.Convert = CeleryPacketLogger.ConvertToRaw.MouseButton1Click:Connect(function()
+    if selected then
+        selected:convert();
+        CeleryPacketLogger.ConvertToRaw.Text = `Convert to {selected:getdatatype() == "Hex" and "Raw" or "Hex"}`;
+    end
+end)
+
+connections.Block = CeleryPacketLogger.BlockPacket.MouseButton1Click:Connect(function()
+    if selected then
+        selected:block();
+        CeleryPacketLogger.BlockPacket.Text = `{selected:isBlocked() == true and "Unblock" or "Block"} Packet`;
+    end
+end)
+
+connections.Clear = CeleryPacketLogger.ClearLogs.MouseButton1Click:Connect(function()
+    for _, packet in pairs(CeleryPacketLogger.AllPackets) do
+        packet:clear();
+    end
+end)
+
+connections.ClearBlock = CeleryPacketLogger.ClearBlocklist.MouseButton1Click:Connect(function()
+    for packetIndex, _ in pairs(CeleryPacketLogger.BlockedPackets) do
+        CeleryPacketLogger.BlockedPackets[packetIndex] = nil;
+    end
+end)
+
+connections.Send = CeleryPacketLogger.SendPacket.MouseButton1Click:Connect(function()
+    if selected then
+        sendpacket({selected.packetId, table.unpack(selected.packetData)});
+    end
+end)
+
+connections.Copy = CeleryPacketLogger.CopyPacket.MouseButton1Click:Connect(function()
+    if selected then
+        local packetData = selected.dataType == "Hex" and toHex(selected.packetData) or table.concat(selected.packetData, ",");
+        setclipboard("{"..selected.opcode..", "..packetData.."}");
+    end
+end)
+
+genv.on_packet_send = function(packet)
+    if not state then return; end
+
+    local packet = Modules.Packet.new(packet); if not packet then return; end
+    connections[#connections+1] = packet.button.MouseButton1Click:Connect(function()
+        packet:view();
+        selected = packet;
+        CeleryPacketLogger.ConvertToRaw.Text = `Convert to {selected:getdatatype() == "Hex" and "Raw" or "Hex"}`;
+        CeleryPacketLogger.BlockPacket.Text = `{selected:isBlocked() == true and "Unblock" or "Block"} Packet`;
+    end)
+end
+
+genv.CeleryPacketLogger_Disconnect = function()
+    if game:GetService("CoreGui"):FindFirstChild("plogger") then
+        game:GetService("CoreGui"):FindFirstChild("plogger"):Destroy();
+    end
+
+    for _, connection in pairs(connections) do
+        connection:Disconnect();
+        connection = nil;
+    end
+    connections = nil;
+
+    genv.on_packet_send = function() end;
+    genv.CeleryPacketLogger_Disconnect = nil;
+    genv.CeleryPacketLogger = nil;
+end
+
+genv.CeleryPacketLogger = true;
