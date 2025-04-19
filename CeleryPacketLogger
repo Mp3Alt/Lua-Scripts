@@ -4,7 +4,7 @@ local clonefunction = clonefunction or function(f) return (function(...) return 
 local cloneref = cloneref or function(ref) return ref end;
 
 local genv = clonefunction(getgenv)();
-local sendpacket = clonefunction(send_packet);
+local sendpacket = clonefunction(rnet.sendpacket);
 local setclipboard = clonefunction(setclipboard);
 
 if genv.CeleryPacketLogger and genv.CeleryPacketLogger_Disconnect then
@@ -119,7 +119,7 @@ connections.Copy = CeleryPacketLogger.CopyPacket.MouseButton1Click:Connect(funct
     end
 end)
 
-genv.on_packet_send = function(packet)
+connections.packetConnection = rnet.Capture:Connect(function(packet)
     if not state then return; end
 
     local packet = Modules.Packet.new(packet); if not packet then return; end
@@ -129,7 +129,7 @@ genv.on_packet_send = function(packet)
         CeleryPacketLogger.ConvertToRaw.Text = `Convert to {selected:getdatatype() == "Hex" and "Raw" or "Hex"}`;
         CeleryPacketLogger.BlockPacket.Text = `{selected:isBlocked() == true and "Unblock" or "Block"} Packet`;
     end)
-end
+end)
 
 genv.CeleryPacketLogger_Disconnect = function()
     if game:GetService("CoreGui"):FindFirstChild("plogger") then
@@ -142,7 +142,6 @@ genv.CeleryPacketLogger_Disconnect = function()
     end
     connections = nil;
 
-    genv.on_packet_send = function() end;
     genv.CeleryPacketLogger_Disconnect = nil;
     genv.CeleryPacketLogger = nil;
 end
