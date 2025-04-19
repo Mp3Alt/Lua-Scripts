@@ -1,3 +1,5 @@
+--/* This is scripted poorly, I know. It's being re-scripted as you're reading this!
+
 if not game:IsLoaded() then game.Loaded:Wait(); end
 
 local clonefunction = clonefunction or function(f) return (function(...) return f(...) end) end;
@@ -12,7 +14,7 @@ if genv.CeleryPacketLogger and genv.CeleryPacketLogger_Disconnect then
     genv.CeleryPacketLogger = nil;
 end
 
-local CeleryPacketLogger = loadstring(game:HttpGet("https://raw.githubusercontent.com/Mp3Alt/UI/refs/heads/main/CeleryPacketLogger"), "CeleryPacketLogger")()
+local CeleryPacketLogger = loadstring(game:HttpGet("https://raw.githubusercontent.com/Mp3Alt/UI/refs/heads/main/CeleryPacketLogger"), "CeleryPacketLogger_GUI")()
 local Modules = CeleryPacketLogger.Modules;
 --[[
 {
@@ -63,11 +65,7 @@ local function toHex(packetData)
         return "";
     end
 
-    local lines = {}
-    for i = 1, #hexParts, 30 do
-        table.insert(lines, table.concat(hexParts, " ", i, math.min(i + 30 - 1, #hexParts)));
-    end
-    return table.concat(lines, "\n");
+    return table.concat(hexParts, ",");
 end
 
 local state, selected, connections = false, nil, {};
