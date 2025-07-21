@@ -1543,28 +1543,28 @@ end
 print("")
 print("|-- Regex --|")
 do
-    checkFunction({"Regex.match"}, {"([A-Z])\\w+", "MNC Regex Pattern"}, function(self, returned)
+    checkFunction({"regex.match"}, {"([A-Z])\\w+", "MNC regex Pattern"}, function(self, returned)
         assert(debug.info(self, "s") == "[C]", "Function is not native C")
         assert(type(returned)=="string", "Expected 'string', got "..type(returned))
 
         assert(returned == "MNC", "matched to an unexpected value")
-        assert(Regex.match("([A-Z])\\w+", "mnc regex pattern") == "", "matched to an unexpected value")
-        assert(Regex.match("([A-Z])\\w+", "MNCRegexPattern") == "MNCRegexPattern", "matched to an unexpected value")
+        assert(regex.match("([A-Z])\\w+", "mnc regex pattern") == "", "matched to an unexpected value")
+        assert(regex.match("([A-Z])\\w+", "MNCRegexPattern") == "MNCRegexPattern", "matched to an unexpected value")
 
         return 0
     end)
 
-    checkFunction({"Regex.matchall"}, {"([A-Z])\\w+", "MNC Regex Pattern"}, function(self, returned)
+    checkFunction({"regex.matchall"}, {"([A-Z])\\w+", "MNC regex Pattern"}, function(self, returned)
         assert(debug.info(self, "s") == "[C]", "Function is not native C")
         assert(type(returned)=="table", "Expected 'table', got "..type(returned))
 
         assert(returned[1] == "MNC", "match 1 matched to an unexpected value")
-        assert(returned[2] == "Regex", "match 2 matched to an unexpected value")
+        assert(returned[2] == "regex", "match 2 matched to an unexpected value")
         assert(returned[3] == "Pattern", "match 3 matched to an unexpected value")
         return 0
     end)
 
-    checkFunction({"Regex.replace"}, {"([A-Z])\\w+", "Replace", "MNC regex pattern"}, function(self, returned)
+    checkFunction({"regex.replace"}, {"([A-Z])\\w+", "Replace", "MNC regex pattern"}, function(self, returned)
         assert(debug.info(self, "s") == "[C]", "Function is not native C")
         assert(type(returned)=="string", "Expected 'string', got "..type(returned))
 
@@ -1576,7 +1576,7 @@ end
 print("")
 print("|-- Stopwatch --|")
 do
-    checkFunction({"Stopwatch.new"}, {}, function(self, returned)
+    checkFunction({"stopwatch.new"}, {}, function(self, returned)
         assert(debug.info(self, "s") == "[C]", "Function is not native C")
         assert(type(returned)=="string", "Expected 'string', got "..type(returned))
 
