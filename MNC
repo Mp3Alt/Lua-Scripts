@@ -1763,23 +1763,24 @@ end
 print("")
 print("|-- crypt --|")
 do
-    checkFunction({"crypt.hash"}, {"md5", "MNC TEST SCRIPT"}, function(self, returned)
+    checkFunction({"crypt.hash"}, {"MNC TEST SCRIPT"}, function(self, returned)
         assert(debug.info(self, "s") == "[C]", "Function is not native C")
         assert(type(returned)=="string", "Expected 'string', got "..type(returned))
 
-        assert(returned=="8449104c3bc3a19d101f6eab75c3d7df", "returned unexpected md5 hashed string")
-        assert(crypt.hash("MNC TEST SCRIPT")=="8449104c3bc3a19d101f6eab75c3d7df", "cipher should defult to md5")
+        assert(returned=="8449104c3bc3a19d101f6eab75c3d7df", "cipher should defult to md5")
+        assert(crypt.hash("md5", "MNC TEST SCRIPT")=="8449104c3bc3a19d101f6eab75c3d7df", "cipher should defult to md5")
         assert(crypt.hash("sha1", "MNC TEST SCRIPT")=="30fcc77b84855f4eef878322bdbad979c81cf4fc", "returned unexpected sha1 hashed string")
         assert(crypt.hash("sha256", "MNC TEST SCRIPT")=="bc5255b73a53bca46f3b8316a9d6d5423b65e4c9357b9a4ed16093220a8a6659", "returned unexpected sha256 hashed string")
 
         return 0
     end)
 
-    checkFunction({"crypt.hmac"}, {"md5", "MNC TEST SCRIPT", "key1"}, function(self, returned)
+    checkFunction({"crypt.hmac"}, {"MNC TEST SCRIPT", "key1"}, function(self, returned)
         assert(debug.info(self, "s") == "[C]", "Function is not native C")
         assert(type(returned)=="string", "Expected 'string', got "..type(returned))
 
-        assert(returned=="3ac30d2ec6cd431d9b3aa6b4fbe68d6c", "returned unexpected hmac md5 hashed string")
+        assert(returned=="3ac30d2ec6cd431d9b3aa6b4fbe68d6c", "cipher should defult to md5")
+        assert(crypt.hmac("md5", "MNC TEST SCRIPT", "key1")=="3ac30d2ec6cd431d9b3aa6b4fbe68d6c", "returned unexpected hmac sha1 hashed string")
         assert(crypt.hmac("sha1", "MNC TEST SCRIPT", "key1")=="b0889d98d89736421b60cb18bd630e6bcf2b4c0f", "returned unexpected hmac sha1 hashed string")
         assert(crypt.hmac("sha256", "MNC TEST SCRIPT", "key1")=="f0af3f08fd591bf5282df9664a2a0f899b010f0c9b18a9f92d0826039d4afef2", "returned unexpected hmac sha256 hashed string")
 
