@@ -930,17 +930,21 @@ end
 print("")
 print("|-- Reflection --|")
 do
+    local old = Players.BanningEnabled
     checkFunction({"setscriptable"}, {Players, 'BanningEnabled', true}, function(self, returned)
         assert(debug.info(self, "s") == "[C]", "Function is not native C")
         assert(type(returned) == "boolean", "Expected 'boolean', got "..type(returned))
-        assert(returned == true, "didn't return flags original state");
+        assert(returned == old, "didn't return flags original state");
 
-        pcall(function() Players.BanningEnabled = false end)
-        assert(Players.BanningEnabled == false, "failed to set a read-only property after setting it to scriptable");
-        pcall(function() Players.BanningEnabled = true end)
+        local oldbanning = Players.BanningEnabled
+        pcall(function() Players.BanningEnabled = not oldbanning end)
+        assert(Players.BanningEnabled == not oldbanning, "failed to set a read-only property after setting it to scriptable");
+        pcall(function() Players.BanningEnabled = oldbanning end)
+        oldbanning = nil
 
         return 0;
     end)
+    old = nil
 
     checkFunction({"gethiddenproperty"}, {Players.LocalPlayer.Character:FindFirstChild"Humanoid", "Health_XML"}, function(self, returned)
         assert(debug.info(self, "s") == "[C]", "Function is not native C")
