@@ -14,6 +14,8 @@ local RunService = game:GetService("RunService");
 local StarterPlayer = game:GetService("StarterPlayer");
 local UserInputService = game:GetService("UserInputService");
 
+repeat task.wait() until Players.LocalPlayer.Character and Players.LocalPlayer.Character:FindFirstChild("Head")
+
 local Pass, NA, Fail = 0, 0, 0
 
 local function checkFunction(aliasTable, args, callback, na)
@@ -964,7 +966,11 @@ do
         assert(debug.info(self, "s") == "[C]", "Function is not native C")
         assert(type(returned) == "table", "Expected 'table', got "..type(returned))
 
-        assert(#returned > 0, "returned blank table");
+        local len = 0
+        for i,v in pairs(returned) do
+            len += 1
+        end
+        assert(len > 0, "returned blank table");
 
         assert(returned["Health"], "returned table without basic properties");
         assert(returned["Health_XML"], "returned table without non-scriptable properties");
@@ -976,7 +982,11 @@ do
         assert(debug.info(self, "s") == "[C]", "Function is not native C")
         assert(type(returned) == "table", "Expected 'table', got "..type(returned))
 
-        assert(#returned > 0, "returned blank table");
+        local len = 0
+        for i,v in pairs(returned) do
+            len += 1
+        end
+        assert(len > 0, "returned blank table");
 
         assert(returned["Health_XML"], "returned table without non-scriptable properties");
 
