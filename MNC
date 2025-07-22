@@ -930,11 +930,10 @@ end
 print("")
 print("|-- Reflection --|")
 do
-    local old = Players.BanningEnabled
     checkFunction({"setscriptable"}, {Players, 'BanningEnabled', true}, function(self, returned)
         assert(debug.info(self, "s") == "[C]", "Function is not native C")
         assert(type(returned) == "boolean", "Expected 'boolean', got "..type(returned))
-        assert(returned == old, "didn't return flags original state");
+        assert(returned, "didn't return flags original state");
 
         local oldbanning = Players.BanningEnabled
         pcall(function() Players.BanningEnabled = not oldbanning end)
