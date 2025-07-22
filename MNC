@@ -1768,6 +1768,7 @@ do
         assert(type(returned)=="string", "Expected 'string', got "..type(returned))
 
         assert(returned=="8449104c3bc3a19d101f6eab75c3d7df", "returned unexpected md5 hashed string")
+        assert(crypt.hash("MNC TEST SCRIPT")=="8449104c3bc3a19d101f6eab75c3d7df", "cipher should defult to md5")
         assert(crypt.hash("sha1", "MNC TEST SCRIPT")=="30fcc77b84855f4eef878322bdbad979c81cf4fc", "returned unexpected sha1 hashed string")
         assert(crypt.hash("sha256", "MNC TEST SCRIPT")=="bc5255b73a53bca46f3b8316a9d6d5423b65e4c9357b9a4ed16093220a8a6659", "returned unexpected sha256 hashed string")
 
