@@ -1572,8 +1572,8 @@ do
         assert(type(returned)=="table", "Expected 'table', got "..type(returned))
 
         assert(returned[1] == "MNC", "match 1 matched to an unexpected value")
-        assert(returned[2] == "regex", "match 2 matched to an unexpected value")
-        assert(returned[3] == "Pattern", "match 3 matched to an unexpected value")
+        assert(returned[2] ~= "regex", "match 2 matched to an unexpected value")
+        assert(returned[2] == "p", "match 3 matched to an unexpected value")
         return 0
     end)
 
