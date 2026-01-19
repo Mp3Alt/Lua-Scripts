@@ -1,0 +1,64 @@
+local library = loadstring(game:HttpGet("https://raw.githubusercontent.com/Mp3Alt/UI/refs/heads/main/gamesense", true), "gamesense")()
+
+local Window = library:CreateWindow({
+    Key = Enum.KeyCode.RightControl,
+})
+local Page = Window:CreatePage({
+    Icon = "rbxassetid://8547236654"
+})
+
+local Page2 = Window:CreatePage({
+    Icon = "rbxassetid://8547254518"
+})
+
+local Section = Page:CreateSection({
+    Name = "Section 1",
+    Size = 150,
+    Side = "Left",
+})
+
+local Toggle = Section:CreateToggle({
+    Name = "Toggle 1",
+    Callback = function(state)
+        print("Toggle 1", state)
+    end
+})
+
+local Slider = Section:CreateSlider({
+    Name = "Slider 1",
+    Default = 10,
+    Min = 0,
+    Max = 100,
+    Decimals = 1,
+    Suffix = "ms",
+    Callback = function(state)
+        print("Slider 1", state)
+    end
+})
+
+local Multibox = Section:CreateMultibox({
+    Name = "Multibox 1",
+    Default = {1},
+    Options = {1, 2, 3},
+    Min = 1,
+    Max = 2,
+    Callback = function(state)
+        print("Multibox 1", state)
+    end
+})
+
+local Keybind = Section:CreateKeybind({
+    Name = "Keybind 1",
+    Mode = "Hold",
+    Callback = function(state)
+        print("Keybind 1", state)
+    end
+})
+
+local Colorpicker = Section:CreateColorpicker({
+    Name = "Colorpicker 1",
+    State = Color3.fromRGB(255, 255, 255),
+    Callback = function(state)
+        print("Colorpicker 1", state)
+    end
+})
