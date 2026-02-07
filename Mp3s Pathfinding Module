@@ -9,6 +9,10 @@ type Pathfinding = {
 	SmoothPath: boolean,
 	Ignore: { Instance },
 	Debug: boolean,
+
+	FindPath: (Start: Vector3, End: Vector3, Step: number?, AgentRadius: number?) -> { Vector3 }?,
+	Visualize: (Path: { Vector3 }, ParentInfo: Instance?) -> nil,
+	DebugStart: () -> nil,
 }
 
 type Node = {
@@ -406,7 +410,7 @@ function Pathfinding.DebugStart()
 	local Mouse = Player:GetMouse()
 
 	if not Player.Character then
-		return
+		return nil
 	end
 
 	print("[MPM]: Click anywhere to pathfind.")
@@ -414,7 +418,7 @@ function Pathfinding.DebugStart()
 	Mouse.Button1Down:Connect(function()
 		local Character = Player.Character
 		if not Character or not Character:FindFirstChild("HumanoidRootPart") then
-			return
+			return nil
 		end
 
 		if not table.find(Pathfinding.Ignore, Character) then
