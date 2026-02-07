@@ -1,0 +1,443 @@
+--!strict
+--?> Mp3s Pathfinding Module
+
+type Pathfinding = {
+	Timeout: number,
+	NodesPerFrame: number,
+	NodeStep: number,
+	MaxNodes: number,
+	SmoothPath: boolean,
+	Ignore: { Instance },
+	Debug: boolean,
+}
+
+type Node = {
+	Position: Vector3,
+	G: number,
+	H: number,
+	F: number,
+	Parent: Node?,
+	HeapIndex: number,
+}
+
+local args = { ... }
+
+local Pathfinding = {} :: Pathfinding
+Pathfinding.__index = Pathfinding
+
+Pathfinding.Timeout = args.Timeout or 10.0 --?> Max total seconds
+Pathfinding.NodesPerFrame = args.NodesPerFrame or 30 --?> Max nodes to process per frame (lower = smoother FPS)
+Pathfinding.NodeStep = args.NodeStep or 3 --?> Grid size (larger = faster but less precise)
+Pathfinding.MaxNodes = args.MaxNodes or 5000 --?> Safety limit
+Pathfinding.SmoothPath = args.SmoothPath or true --?> Allow path smoothing
+Pathfinding.Ignore = args.Ignore or {} :: { Instance } --?> Ignore parts
+Pathfinding.Debug = args.Debug or false --?> Disable debug outputs for performance
+
+local NEIGHBORS = {}
+for x = -1, 1 do
+	for y = -1, 1 do
+		for z = -1, 1 do
+			if not (x == 0 and y == 0 and z == 0) then
+				table.insert(NEIGHBORS, Vector3.new(x, y, z))
+			end
+		end
+	end
+end
+
+local RayParams = RaycastParams.new()
+RayParams.FilterType = Enum.RaycastFilterType.Exclude
+
+local OverlapParamsObj = OverlapParams.new()
+OverlapParamsObj.FilterType = Enum.RaycastFilterType.Exclude
+
+--?> Heap
+local Heap = {}
+Heap.__index = Heap
+
+function Heap.new()
+	return setmetatable({ Items = {}, Count = 0 }, Heap)
+end
+
+function Heap:Add(Item: Node)
+	self.Count += 1
+	self.Items[self.Count] = Item
+	Item.HeapIndex = self.Count
+	self:SortUp(Item)
+end
+
+function Heap:RemoveFirst(): Node
+	local First = self.Items[1]
+	local Last = self.Items[self.Count]
+
+	self.Items[1] = Last
+	self.Items[self.Count] = nil
+	self.Count -= 1
+
+	if self.Count > 0 then
+		Last.HeapIndex = 1
+		self:SortDown(Last)
+	end
+
+	First.HeapIndex = 0
+	return First
+end
+
+function Heap:UpdateItem(Item: Node)
+	self:SortUp(Item)
+end
+
+function Heap:Contains(Item: Node): boolean
+	return Item.HeapIndex > 0 and self.Items[Item.HeapIndex] == Item
+end
+
+function Heap:SortUp(Item: Node)
+	local ParentIndex = math.floor(Item.HeapIndex / 2)
+	while ParentIndex >= 1 do
+		local ParentItem = self.Items[ParentIndex]
+		if ParentItem and Item.F < ParentItem.F then
+			self:Swap(Item, ParentItem)
+			ParentIndex = math.floor(Item.HeapIndex / 2)
+		else
+			break
+		end
+	end
+end
+
+function Heap:SortDown(Item: Node)
+	while true do
+		local LeftChildIndex = Item.HeapIndex * 2
+		local RightChildIndex = Item.HeapIndex * 2 + 1
+		local SwapIndex = 0
+
+		if LeftChildIndex <= self.Count then
+			SwapIndex = LeftChildIndex
+			if RightChildIndex <= self.Count then
+				if self.Items[RightChildIndex].F < self.Items[LeftChildIndex].F then
+					SwapIndex = RightChildIndex
+				end
+			end
+
+			if self.Items[SwapIndex].F < Item.F then
+				self:Swap(Item, self.Items[SwapIndex])
+			else
+				break
+			end
+		else
+			break
+		end
+	end
+end
+
+function Heap:Swap(ItemA: Node, ItemB: Node)
+	self.Items[ItemA.HeapIndex], self.Items[ItemB.HeapIndex] = ItemB, ItemA
+	local TempIndex = ItemA.HeapIndex
+	ItemA.HeapIndex = ItemB.HeapIndex
+	ItemB.HeapIndex = TempIndex
+end
+
+local function GridSnap(Pos: Vector3, Step: number): Vector3
+	return Vector3.new(
+		math.round(Pos.X / Step) * Step,
+		math.round(Pos.Y / Step) * Step,
+		math.round(Pos.Z / Step) * Step
+	)
+end
+
+local function Heuristic(A: Vector3, B: Vector3): number
+	return (A - B).Magnitude
+end
+
+--?> Check if a position is walkable (not inside geometry)
+local function IsWalkable(Pos: Vector3, Radius: number): boolean
+	return #workspace:GetPartBoundsInRadius(Pos, Radius, OverlapParamsObj) == 0
+end
+
+--?> Smooth path by removing unnecessary waypoints (string pulling)
+local function SmoothPath(Path: { Vector3 }, Radius: number): { Vector3 }
+	if #Path <= 2 then
+		return Path
+	end
+
+	local Smoothed = { Path[1] }
+	local Current = 1
+
+	while Current < #Path do
+		local Farthest = Current + 1
+
+		for i = #Path, Current + 2, -1 do
+			local From = Path[Current]
+			local To = Path[i]
+			local Direction = To - From
+
+			local Hit = workspace:Raycast(From, Direction, RayParams)
+			if not Hit then
+				local MidPoint = From + Direction * 0.5
+				if IsWalkable(MidPoint, Radius) then
+					Farthest = i
+					break
+				end
+			end
+		end
+
+		table.insert(Smoothed, Path[Farthest])
+		Current = Farthest
+	end
+
+	return Smoothed
+end
+
+function Pathfinding.FindPath(Start: Vector3, End: Vector3, Step: number?, AgentRadius: number?)
+	local NodeStep = Step or Pathfinding.NodeStep
+	local Radius = AgentRadius or 1.5
+
+	RayParams.FilterDescendantsInstances = Pathfinding.Ignore
+	OverlapParamsObj.FilterDescendantsInstances = Pathfinding.Ignore
+
+	local StartPos = GridSnap(Start, NodeStep)
+	local EndPos = GridSnap(End, NodeStep)
+
+	if Pathfinding.Debug then
+		print("[MPM]: Start:", StartPos, "End:", EndPos, "Step:", NodeStep)
+	end
+
+	--?> Validate start position
+	if not IsWalkable(StartPos, Radius) then
+		--?> If not valid, try to find a nearby valid start
+		for _, Offset in NEIGHBORS do
+			local TestPos = StartPos + (Offset * NodeStep)
+			if IsWalkable(TestPos, Radius) then
+				StartPos = TestPos
+				if Pathfinding.Debug then
+					print("[MPM]: Adjusted start to:", StartPos)
+				end
+				break
+			end
+		end
+
+		--?> Still not valid? Fail fast
+		if not IsWalkable(StartPos, Radius) then
+			warn("[MPM]: Start position is blocked!")
+			return nil
+		end
+	end
+
+	--?> Validate end position
+	if not IsWalkable(EndPos, Radius) then
+		--?> If not valid, try to find a nearby valid end
+		for _, Offset in NEIGHBORS do
+			local TestPos = EndPos + (Offset * NodeStep)
+			if IsWalkable(TestPos, Radius) then
+				EndPos = TestPos
+				if Pathfinding.Debug then
+					print("[MPM]: Adjusted end to:", EndPos)
+				end
+				break
+			end
+		end
+	end
+
+	local AllNodes: { [Vector3]: Node } = {}
+	local OpenSet = Heap.new()
+	local ClosedSet: { [Vector3]: boolean } = {}
+
+	local StartNode: Node = {
+		Position = StartPos,
+		G = 0,
+		H = Heuristic(StartPos, EndPos),
+		F = 0,
+		Parent = nil,
+		HeapIndex = 0,
+	}
+	StartNode.F = StartNode.G + StartNode.H
+
+	OpenSet:Add(StartNode)
+	AllNodes[StartPos] = StartNode
+
+	local TotalStartTime = os.clock()
+	local NodesProcessed = 0
+	local NodesThisFrame = 0
+	local LastDebugTime = os.clock()
+
+	while OpenSet.Count > 0 do
+		--?> Total timeout
+		local Elapsed = os.clock() - TotalStartTime
+		if Elapsed > Pathfinding.Timeout then
+			if Pathfinding.Debug then
+				warn("[MPM]: Timed out after", NodesProcessed, "nodes")
+			end
+			return nil
+		end
+
+		--?> Max nodes safety
+		if NodesProcessed >= Pathfinding.MaxNodes then
+			if Pathfinding.Debug then
+				warn("[MPM]: Hit max node limit:", Pathfinding.MaxNodes)
+			end
+			return nil
+		end
+
+		--?> Yield every N nodes
+		NodesThisFrame += 1
+		if NodesThisFrame >= Pathfinding.NodesPerFrame then
+			task.wait()
+			NodesThisFrame = 0
+		end
+
+		--?> Debug progress every second
+		if Pathfinding.Debug and (os.clock() - LastDebugTime) > 1.0 then
+			print(
+				string.format(
+					"[MPM]: Progress: %d nodes, OpenSet: %d, Elapsed: %.1fs",
+					NodesProcessed,
+					OpenSet.Count,
+					Elapsed
+				)
+			)
+			LastDebugTime = os.clock()
+		end
+
+		local CurrentNode = OpenSet:RemoveFirst()
+		ClosedSet[CurrentNode.Position] = true
+		NodesProcessed += 1
+
+		--?> Check if reached destination
+		local DistToEnd = (CurrentNode.Position - EndPos).Magnitude
+		if DistToEnd < NodeStep * 1.5 then
+			local Path = {}
+			local RetraceNode: Node? = CurrentNode
+			while RetraceNode do
+				table.insert(Path, 1, RetraceNode.Position)
+				RetraceNode = RetraceNode.Parent
+			end
+
+			--?> Smooth the path to remove unnecessary waypoints
+			if Pathfinding.SmoothPath then
+				Path = SmoothPath(Path, Radius)
+			end
+
+			if Pathfinding.Debug then
+				print("[MPM]: Success! Nodes:", NodesProcessed, "Path length:", #Path)
+			end
+			return Path
+		end
+
+		--?> Process neighbors
+		for _, Offset in NEIGHBORS do
+			local NeighborPos = CurrentNode.Position + (Offset * NodeStep)
+
+			if ClosedSet[NeighborPos] then
+				continue
+			end
+
+			if not IsWalkable(NeighborPos, Radius) then
+				ClosedSet[NeighborPos] = true
+				continue
+			end
+
+			local RayDirection = NeighborPos - CurrentNode.Position
+			if workspace:Raycast(CurrentNode.Position, RayDirection, RayParams) then
+				ClosedSet[NeighborPos] = true
+				continue
+			end
+
+			local MoveCost = CurrentNode.G + NodeStep
+			local NeighborNode = AllNodes[NeighborPos]
+
+			if not NeighborNode then
+				NeighborNode = {
+					Position = NeighborPos,
+					G = MoveCost,
+					H = Heuristic(NeighborPos, EndPos),
+					F = 0,
+					Parent = CurrentNode,
+					HeapIndex = 0,
+				}
+				NeighborNode.F = NeighborNode.G + NeighborNode.H
+				AllNodes[NeighborPos] = NeighborNode
+				OpenSet:Add(NeighborNode)
+			elseif MoveCost < NeighborNode.G then
+				NeighborNode.G = MoveCost
+				NeighborNode.Parent = CurrentNode
+				NeighborNode.F = NeighborNode.G + NeighborNode.H
+				if OpenSet:Contains(NeighborNode) then
+					OpenSet:UpdateItem(NeighborNode)
+				else
+					OpenSet:Add(NeighborNode)
+				end
+			end
+		end
+	end
+
+	if Pathfinding.Debug then
+		warn("[MPM]: No path exists (exhausted all options after", NodesProcessed, "nodes)")
+	end
+	return nil
+end
+
+function Pathfinding.Visualize(Path: { Vector3 }, ParentInfo: Instance?)
+	local Parent = ParentInfo or workspace
+
+	local Old = Parent:FindFirstChild("PathVisualization")
+	if Old then
+		Old:Destroy()
+	end
+
+	local Folder = Instance.new("Folder")
+	Folder.Name = "PathVisualization"
+	Folder.Parent = Parent
+
+	for i, Pos in ipairs(Path) do
+		local Part = Instance.new("Part")
+		Part.Size = Vector3.new(1, 1, 1)
+		Part.Anchored = true
+		Part.CanCollide = false
+		Part.Material = Enum.Material.Neon
+		Part.Color = Color3.fromHSV(i / #Path * 0.3, 1, 1)
+		Part.Position = Pos
+		Part.Shape = Enum.PartType.Ball
+		Part.Parent = Folder
+	end
+
+	game:GetService("Debris"):AddItem(Folder, 10)
+end
+
+function Pathfinding.DebugStart()
+	local Player = game:GetService("Players").LocalPlayer
+	local Mouse = Player:GetMouse()
+
+	if not Player.Character then
+		return
+	end
+
+	print("[MPM]: Click anywhere to pathfind.")
+
+	Mouse.Button1Down:Connect(function()
+		local Character = Player.Character
+		if not Character or not Character:FindFirstChild("HumanoidRootPart") then
+			return
+		end
+
+		if not table.find(Pathfinding.Ignore, Character) then
+			table.insert(Pathfinding.Ignore, Character)
+		end
+
+		local Start = Character.HumanoidRootPart.Position
+		local End = Mouse.Hit.Position
+
+		task.spawn(function()
+			print("[MPM]: Starting pathfind from", Start, "to", End)
+			local StartTime = os.clock()
+			local Path = Pathfinding.FindPath(Start, End)
+			local Elapsed = os.clock() - StartTime
+
+			if Path then
+				print(string.format("[MPM]: Complete! %d nodes in %.0fms", #Path, Elapsed * 1000))
+				Pathfinding.Visualize(Path, workspace)
+			else
+				warn("[MPM]: Failed after", string.format("%.0fms", Elapsed * 1000))
+			end
+		end)
+	end)
+end
+
+return Pathfinding
